@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ทำไมน้ำมันไทยถึงแพง?</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#0c1828;color:#F4F1E8;font-family:Prompt,Kanit,'Noto Sans Thai',Sarabun,system-ui,sans-serif}
+#app{min-height:100dvh;padding:max(10px,env(safe-area-inset-top)) 12px max(14px,env(safe-area-inset-bottom));max-width:560px;margin:auto;display:flex;flex-direction:column;gap:10px}
+#steps{font-size:13px;opacity:.75;text-align:center}
+.btn,button{min-height:48px;border:0;border-radius:14px;background:#39A89D;color:#fff;font:600 16px inherit;font-family:inherit;padding:0 16px;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none}
+button.alt{background:#1f3a5a}
+select{min-height:48px;width:100%;border:0;border-radius:14px;background:#1f3a5a;color:#fff;font:500 15px inherit;font-family:inherit;padding:0 12px}
+#banner{font-size:13px;padding:8px 12px;border-radius:10px;background:#E65353;color:#fff;text-align:center}
+#banner.ok{background:#1d5d57}
+#stage{margin:0 auto;background:#000;border-radius:14px;overflow:hidden;max-width:100%}
+#stage.v{height:min(58dvh,calc((100vw - 24px)*16/9));aspect-ratio:9/16}
+#stage.h{width:100%;aspect-ratio:16/9}
+#stage.s{width:min(100%,58dvh);aspect-ratio:1/1}
+#cv{width:100%;height:100%;display:block}
+#ctl{display:flex;gap:8px;align-items:center}
+#ctl button{min-width:48px;padding:0 10px}
+#seek{flex:1;height:48px}
+#tm{font-size:12px;min-width:74px;text-align:center}
+#scenes{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+#scenes button{min-height:40px;padding:0 12px;background:#1f3a5a;flex:none}
+#scenes button.on{background:#F4A340;color:#252A34}
+details{background:#14304d;border-radius:12px;padding:8px 12px}
+summary{min-height:40px;display:flex;align-items:center;cursor:pointer}
+.row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px}
+.row span{flex:1}.row button{min-height:44px;min-width:56px;padding:0}
+#exp{display:flex;flex-direction:column;gap:8px}
+#prog{font-size:13px;white-space:pre-line}
+#bar{height:8px;background:#1f3a5a;border-radius:4px;overflow:hidden}#bar i{display:block;height:100%;width:0;background:#F4A340}
+#res{display:flex;flex-direction:column;gap:8px}
+#res video{width:100%;border-radius:12px;margin-top:6px;background:#000}
+#res a.btn{background:#F4A340;color:#252A34}
+.hint{font-size:12px;opacity:.75;line-height:1.5}
+</style></head><body><div id="app">
+<div id="steps">ขั้นตอน: 1) นำเข้าเสียงพากย์ 2) เลือกขนาด + ดูตัวอย่าง 3) สร้างวิดีโอ MP4</div>
+<label class="btn" for="file">1) นำเข้าเสียงพากย์ (mp3 / m4a / wav)</label>
+<input type="file" id="file" accept="audio/mpeg,audio/mp3,.mp3,audio/mp4,audio/x-m4a,.m4a,audio/aac,.aac,audio/wav,audio/x-wav,.wav,audio/*" hidden>
+<div id="banner">เวลาโดยประมาณ ยังไม่ซิงก์กับเสียงจริง</div>
+<select id="fmt">
+<option value="v1080">มือถือ 9:16 • 1080×1920 (Shorts / TikTok / Reels)</option>
+<option value="v720">มือถือ 9:16 • 720×1280 (เร็ว ไฟล์เล็ก)</option>
+<option value="h1080">YouTube 16:9 • 1920×1080 (Full HD)</option>
+<option value="h720">YouTube 16:9 • 1280×720 (HD)</option>
+<option value="s1080">สี่เหลี่ยม 1:1 • 1080×1080 (Facebook / IG)</option>
+</select>
+<div id="stage" class="v"><canvas id="cv" width="720" height="1280"></canvas></div>
+<div id="ctl"><button id="pl">▶</button><input type="range" id="seek" min="0" max="1000" value="0"><span id="tm">0:00</span><button id="mu" class="alt">🔊</button><button id="fs" class="alt">⛶</button></div>
+<div id="ahint" class="hint" hidden>iPhone/iPad: ถ้ากด ▶ แล้วไม่มีเสียง ให้ปิดโหมดเงียบ (สวิตช์ด้านข้าง) และเพิ่มระดับเสียง</div>
+<div id="scenes"></div>
+<details><summary>ปรับจุดซิงก์</summary><div id="adjList"></div></details>
+<div id="exp">
+<button id="mk">3) สร้างวิดีโอ MP4</button><button id="cancel" class="alt" hidden>ยกเลิก</button>
+<div id="bar"><i></i></div><div id="prog"></div><div id="res"></div>
+</div></div>
+<script>
+/* ===== DATA (จาก OUTPUT G) ===== */
+const P={bg:'#142B45',card:'#F4F1E8',hl:'#F4A340',warn:'#E65353',pos:'#39A89D',text:'#252A34'};
+const CH={skin:'#E8B58C',hair:'#252A34',shirt:'#F4A340',acc:'#142B45'};
+const G={scenes:[
+{id:'S1',n:"ทำไมประเทศไทยมีโรงกลั่นน้ำมันเอง แต่คนไทยยังต้องเติมน้ำมันแพง?\n\nหรือว่าโรงกลั่นอยู่ในประเทศไทย แต่ราคาน้ำมันไปเที่ยวสิงคโปร์ก่อน?",hw:["โรงกลั่นน้ำมัน","เติมน้ำมันแพง","สิงคโปร์"],bg:{p:'grid_tech'},a:['talk','surprised',.5,.72],pr:[['car',.18,.75,.8],['bottle',.82,.65,1]],cd:[{k:'text',tx:"ทำไมน้ำมันไทยถึงแพง?",at:"เติมน้ำมันแพง",d:3},{k:'stamp',tx:"น้ำมันไปเที่ยวสิงคโปร์?",ang:-8,at:"สิงคโปร์ก่อน",d:1.5}],tr:'zoom',cam:'push',sf:[['pop',"แพง"],['whoosh',"สิงคโปร์ก่อน"]]},
+{id:'S2',n:"ความจริงคือ ราคาน้ำมันหน้าปั๊มไม่ได้มีแค่ต้นทุนเนื้อน้ำมัน แต่ประกอบด้วยหลายส่วน",hw:["ไม่ได้มีแค่ต้นทุนเนื้อน้ำมัน","หลายส่วน"],bg:{p:'lab'},a:['point','happy',.5,.72],pr:[['magnifier',.78,.35,.8],['coin',.22,.42,.7]],cd:[{k:'text',tx:"ราคาหน้าปั๊ม = หลายองค์ประกอบ",at:"หลายส่วน",d:3}],tr:'slide',cam:'push',sf:[['pop',"หลายส่วน"]]},
+{id:'S3',n:"อย่างแรก ราคาน้ำมันสำเร็จรูป ซึ่งผันผวนตามตลาดโลก ประเทศไทยยังต้องนำเข้าน้ำมันดิบจำนวนมาก แม้จะมีโรงกลั่นในประเทศก็ตาม",hw:["ราคาน้ำมันสำเร็จรูป","ตลาดโลก","นำเข้าน้ำมันดิบ","โรงกลั่นในประเทศ"],bg:{p:'ocean'},a:['think','neutral',.5,.74],pr:[['map',.25,.34,.9],['bottle',.78,.35,.9]],cd:[{k:'text',tx:"1. ราคาน้ำมันสำเร็จรูป",at:"ราคาน้ำมันสำเร็จรูป",d:2.5},{k:'text',tx:"ไทยยังนำเข้าน้ำมันดิบ",at:"นำเข้าน้ำมันดิบ",d:3}],tr:'slide',cam:'pan',sf:[['whoosh',"ตลาดโลก"]]},
+{id:'S4',n:"อย่างที่สอง คือ ภาษี ทั้งภาษีสรรพสามิต ภาษีเทศบาล และภาษีมูลค่าเพิ่ม",hw:["ภาษี","ภาษีสรรพสามิต","ภาษีเทศบาล","ภาษีมูลค่าเพิ่ม"],bg:{p:'office'},a:['talk','surprised',.5,.72],pr:[['coin',.22,.35,.9],['book',.8,.38,.8]],cd:[{k:'list',items:["ภาษีสรรพสามิต","ภาษีเทศบาล","ภาษีมูลค่าเพิ่ม"],at:"ภาษี",d:5}],tr:'slide',cam:'push',sf:[['coin',"ภาษีมูลค่าเพิ่ม"]]},
+{id:'S5',n:"อย่างที่สาม คือ กองทุนน้ำมันเชื้อเพลิง ที่บางช่วงเก็บเงินจากน้ำมันบางชนิด และบางช่วงนำเงินไปชดเชยเพื่อพยุงราคา",hw:["กองทุนน้ำมันเชื้อเพลิง","เก็บเงิน","ชดเชย","พยุงราคา"],bg:{p:'grid_tech'},a:['think','neutral',.5,.72],pr:[['coin',.25,.4,.9],['shield',.78,.4,.9]],cd:[{k:'text',tx:"3. กองทุนน้ำมันเชื้อเพลิง",at:"กองทุนน้ำมันเชื้อเพลิง",d:2.5},{k:'compare',l:"เก็บเงินเข้ากองทุน",r:"จ่ายเงินชดเชย",at:"เก็บเงินจากน้ำมันบางชนิด",d:4}],tr:'slide',cam:'pan',sf:[['coin',"เก็บเงิน"],['pop',"ชดเชย"]]},
+{id:'S6',n:"และอย่างที่สี่ คือ ค่าการตลาด ซึ่งรวมค่าใช้จ่ายในการขนส่ง คลังน้ำมัน สถานีบริการ และผลตอบแทนของธุรกิจ",hw:["ค่าการตลาด","การขนส่ง","คลังน้ำมัน","สถานีบริการ","ผลตอบแทน"],bg:{p:'supermarket'},a:['point','happy',.5,.72],pr:[['car',.22,.4,.8],['box',.78,.4,.8]],cd:[{k:'text',tx:"4. ค่าการตลาด",at:"ค่าการตลาด",d:2.5},{k:'list',items:["ขนส่ง","คลังน้ำมัน","สถานีบริการ","ผลตอบแทนธุรกิจ"],at:"ค่าใช้จ่ายในการขนส่ง",d:4.5}],tr:'slide',cam:'pan',sf:[['pop',"สถานีบริการ"]]},
+{id:'S7',n:"แล้วทำไมต้องอิงราคาสิงคโปร์?\n\nเพราะสิงคโปร์เป็นศูนย์กลางซื้อขายน้ำมันสำเร็จรูปของภูมิภาค ราคาจึงถูกนำมาใช้เป็นราคาอ้างอิง ไม่ได้หมายความว่าเราซื้อน้ำมันทุกลิตรจากสิงคโปร์",hw:["ราคาสิงคโปร์","ศูนย์กลางซื้อขาย","ราคาอ้างอิง","ไม่ได้หมายความว่า"],bg:{p:'city_night'},a:['think','surprised',.5,.73],pr:[['map',.5,.35,1.1],['magnifier',.8,.45,.7]],cd:[{k:'map',fr:"สิงคโปร์",to:"ประเทศไทย",at:"ศูนย์กลางซื้อขาย",d:3.5},{k:'stamp',tx:"ราคาอ้างอิง ≠ ซื้อน้ำมันทุกลิตรจากสิงคโปร์",ang:-5,at:"ไม่ได้หมายความว่า",d:3.5}],tr:'zoom',cam:'push',sf:[['whoosh',"สิงคโปร์"],['stamp',"ราคาอ้างอิง"]]},
+{id:'S8',n:"แต่มีเรื่องที่น่าสนใจ!\n\nเมื่อวันที่ 29 ตุลาคม 2569 ไทยเริ่มใช้หลักเกณฑ์ราคาโรงกลั่นใหม่ โดยตัดค่าขนส่ง ค่าประกันภัย และค่าสูญเสียระหว่างขนส่งที่สมมุติว่าขนมาจากสิงคโปร์ออกจากสูตร",hw:["เรื่องที่น่าสนใจ","29 ตุลาคม 2569","หลักเกณฑ์ราคาโรงกลั่นใหม่","ตัดค่าขนส่ง","ค่าประกันภัย","ค่าสูญเสีย"],bg:{p:'office'},a:['cheer','happy',.5,.72],pr:[['book',.22,.4,.8],['box',.78,.4,.8]],cd:[{k:'stamp',tx:"มีการปรับหลักเกณฑ์ใหม่!",ang:-5,at:"เรื่องที่น่าสนใจ",d:2},{k:'title',tx:"หลักเกณฑ์ราคาโรงกลั่นใหม่",at:"หลักเกณฑ์ราคาโรงกลั่นใหม่",d:3},{k:'list',items:["ค่าขนส่ง","ค่าประกันภัย","ค่าสูญเสียระหว่างขนส่ง"],at:"ตัดค่าขนส่ง",d:4.5}],tr:'zoom',cam:'push',sf:[['stamp',"29 ตุลาคม 2569"]]},
+{id:'S9',n:"รัฐบาลประเมินว่าจะช่วยลดภาระประชาชนได้กว่า 10,839 ล้านบาทต่อปี\n\nส่วนราคาวันที่ 6 พฤศจิกายน แก๊สโซฮอล์ 91 อยู่ที่ 39 บาท 47 สตางค์ แก๊สโซฮอล์ 95 อยู่ที่ 39 บาท 84 สตางค์ และดีเซล B7 อยู่ที่ 41 บาท 79 สตางค์ ในราคามาตรฐานกรุงเทพฯ",hw:["10,839 ล้านบาทต่อปี","6 พฤศจิกายน","39 บาท 47 สตางค์","39 บาท 84 สตางค์","41 บาท 79 สตางค์"],bg:{p:'grid_tech'},a:['point','happy',.5,.75],pr:[['coin',.2,.4,.9],['bottle',.8,.4,.9]],cd:[{k:'big',v:"10,839",u:"ล้านบาทต่อปี",at:"10,839 ล้านบาทต่อปี",d:3.5},{k:'compare',l:"แก๊สโซฮอล์ 91: 39.47 บาท",r:"แก๊สโซฮอล์ 95: 39.84 บาท",at:"แก๊สโซฮอล์ 91",d:4},{k:'text',tx:"ดีเซล B7: 41.79 บาท",at:"ดีเซล B7",d:3},{k:'text',tx:"ราคามาตรฐานกรุงเทพฯ วันที่ 6 พฤศจิกายน 2569",at:"ในราคามาตรฐานกรุงเทพฯ",d:2.5}],tr:'slide',cam:'push',sf:[['coin',"10,839 ล้านบาทต่อปี"],['pop',"แก๊สโซฮอล์ 91"]]},
+{id:'S10',n:"สรุปแล้ว น้ำมันแพงไม่ได้เกิดจากโรงกลั่นอย่างเดียว ไม่ได้เกิดจากภาษีอย่างเดียว และไม่ได้เกิดจากสิงคโปร์อย่างเดียว\n\nแต่เกิดจากสูตรราคาทั้งระบบ\n\nและคำถามที่น่าคิดที่สุดก็คือ...\n\nถ้าเราปรับสูตรราคาได้แล้ว ต่อไปเราจะทำอย่างไรให้คนไทยใช้น้ำมันในราคาที่เป็นธรรมและแข่งขันได้จริง?",hw:["สูตรราคาทั้งระบบ","ราคาที่เป็นธรรม","แข่งขันได้จริง"],bg:{p:'plain_gradient',c:['#142B45','#39A89D']},a:['think','smirk',.5,.65],pr:[],cd:[{k:'text',tx:"น้ำมันแพง = สูตรราคาทั้งระบบ",at:"สูตรราคาทั้งระบบ",d:3},{k:'end',tx:"แล้วเราจะทำอย่างไรให้คนไทยใช้น้ำมันในราคาที่เป็นธรรม?",at:"ราคาที่เป็นธรรม",d:5}],tr:'fade',cam:'push',sf:[['ding',"ราคาที่เป็นธรรม"]]}
+],music:{bpm:105}};
+
+/* ===== FORMATS / LAYOUTS ===== */
+const FMT={
+ v1080:{L:'v',W:1080,H:1920,br:8e6},v720:{L:'v',W:720,H:1280,br:5e6},
+ h1080:{L:'h',W:1920,H:1080,br:8e6},h720:{L:'h',W:1280,H:720,br:5e6},
+ s1080:{L:'s',W:1080,H:1080,br:6e6}};
+/* ch=[x,y,scale] ของตัวละคร, card=[dx,dy,scale] ของการ์ด, slots=ตำแหน่งพร็อพ, sub=ซับไตเติล */
+const LAY={
+ v:{W:1080,H:1920,pv:[720,1280],card:[0,0,1],sub:{y:1325,mw:960,fs:56,lh:74}},
+ h:{W:1920,H:1080,pv:[1280,720],ch:[.2,.8,.9],card:[830,40,.95],slots:[[.07,.3,.7],[.33,.3,.7]],sub:{y:990,mw:1700,fs:52,lh:66}},
+ s:{W:1080,H:1080,pv:[900,900],ch:[.19,.8,.62],card:[290,40,.72],slots:[[.12,.2,.55],[.12,.45,.55]],sub:{y:985,mw:1000,fs:46,lh:58}}};
+let fmtKey='v1080',LY=LAY.v;
+
+/* ===== UTIL ===== */
+const $=id=>document.getElementById(id);
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const ease=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const eob=x=>{const c=1.70158;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const F=(px)=>`700 ${px}px Prompt,Kanit,'Noto Sans Thai',Sarabun,system-ui,sans-serif`;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function mulberry32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function mix(a,b,t){const p=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));const A=p(a),B=p(b);return 'rgb('+A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(',')+')'}
+function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+const SEG=typeof Intl!=='undefined'&&Intl.Segmenter?new Intl.Segmenter('th',{granularity:'word'}):{segment:s=>[...s].map((c,i)=>({segment:c,index:i}))};
+function wrap(g,txt,maxW){const lines=[];let cur='';for(const s of SEG.segment(txt)){const w=s.segment;if(cur&&g.measureText(cur+w).width>maxW){lines.push(cur.trim());cur=w}else cur+=w}if(cur.trim())lines.push(cur.trim());return lines}
+
+/* ===== BACKGROUNDS (รองรับทุกสัดส่วน) ===== */
+const bgCache={};
+function mkBg(sc,i,W,H){
+ const c=document.createElement('canvas');c.width=W/2;c.height=H/2;const g=c.getContext('2d');g.scale(.5,.5);
+ const gr=g.createLinearGradient(0,0,0,H),cols=sc.bg.c;
+ if(cols){gr.addColorStop(0,cols[0]);gr.addColorStop(1,cols[1])}else{gr.addColorStop(0,mix(P.bg,'#ffffff',.14));gr.addColorStop(1,P.bg)}
+ g.fillStyle=gr;g.fillRect(0,0,W,H);
+ const r=mulberry32(i+7),p=sc.bg.p,M=Math.max(W,H);g.strokeStyle='rgba(255,255,255,.07)';g.lineWidth=2;
+ if(p==='grid_tech'){for(let x=0;x<=W;x+=90){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke()}for(let y=0;y<=H;y+=90){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke()}}
+ else if(p==='lab'){const sy=H*.46;g.fillStyle='rgba(255,255,255,.08)';g.fillRect(0,sy,W,16);[W*.15,W*.8].forEach(x=>{g.fillStyle='rgba(57,168,157,.35)';g.beginPath();g.moveTo(x-20,sy-100);g.lineTo(x+20,sy-100);g.lineTo(x+70,sy);g.lineTo(x-70,sy);g.closePath();g.fill()})}
+ else if(p==='ocean'){for(let k=0;k<4;k++){g.fillStyle=`rgba(57,168,157,${.14+k*.05})`;g.beginPath();g.moveTo(0,H);for(let x=0;x<=W;x+=30)g.lineTo(x,H*.52+k*H*.083+Math.sin(x/90+k)*26);g.lineTo(W,H);g.fill()}}
+ else if(p==='office'){const bx=W*.11,by=H*.135,bh=Math.min(460,H*.45);g.fillStyle='rgba(244,241,232,.1)';rr(g,bx,by,380,bh,16);g.fill();for(let y=by+30;y<by+bh-20;y+=44)g.fillRect(bx+10,y,360,18);g.fillStyle='rgba(0,0,0,.22)';g.fillRect(0,H*.78,W,H*.22)}
+ else if(p==='supermarket'){for(let row=0;row<3;row++){const y=H*.17+row*220;g.fillStyle='rgba(244,241,232,.14)';g.fillRect(0,y+130,W,14);for(let x=30;x<W-30;x+=90){g.fillStyle=[P.hl,P.pos,P.warn][Math.floor(r()*3)];g.globalAlpha=.4;rr(g,x,y+40+r()*20,64,90,10);g.fill();g.globalAlpha=1}}}
+ else if(p==='city_night'){const base=H*.78,ky=Math.max(H/1920,.55);for(let x=0;x<W;x+=80){const h=(320+r()*520)*ky;g.fillStyle='rgba(8,18,32,.55)';g.fillRect(x,base-h,76,h);for(let y=base-h+20;y<base-20;y+=44)if(r()>.55){g.fillStyle='rgba(244,163,64,.6)';g.fillRect(x+14,y,18,20)}}g.fillStyle='rgba(244,241,232,.8)';g.beginPath();g.arc(W*.815,H*.12,50,0,7);g.fill()}
+ const gl=g.createRadialGradient(W/2,H*.65,40,W/2,H*.65,560);gl.addColorStop(0,'rgba(244,163,64,.22)');gl.addColorStop(1,'rgba(244,163,64,0)');g.fillStyle=gl;g.fillRect(0,0,W,H);
+ const v=g.createRadialGradient(W/2,H/2,M*.31,W/2,H/2,M*.65);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.45)');g.fillStyle=v;g.fillRect(0,0,W,H);
+ return c}
+function getBg(d,i){const k=FMT[fmtKey].L+i;return bgCache[k]||(bgCache[k]=mkBg(d,i,LY.W,LY.H))}
+
+/* ===== PROPS ===== */
+function prop(g,n,x,y,sz,t){g.save();g.translate(x,y+Math.sin(t*2+x)*6);g.scale(sz*1.2,sz*1.2);g.lineWidth=5;g.strokeStyle='#101a2b';g.lineJoin=g.lineCap='round';
+ g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(0,82,70,14,0,0,7);g.fill();
+ if(n==='coin'){g.fillStyle=P.hl;g.beginPath();g.arc(0,0,64,0,7);g.fill();g.stroke();g.beginPath();g.arc(0,0,44,0,7);g.stroke();g.fillStyle=P.text;g.font=F(60);g.textAlign='center';g.textBaseline='middle';g.fillText('฿',0,4)}
+ else if(n==='bottle'){g.fillStyle=P.hl;rr(g,-36,-60,72,140,20);g.fill();g.stroke();g.fillStyle=P.warn;rr(g,-18,-88,36,30,8);g.fill();g.stroke();g.fillStyle=P.card;rr(g,-26,-10,52,50,8);g.fill()}
+ else if(n==='car'){g.fillStyle=P.warn;rr(g,-62,-62,124,50,18);g.fill();g.stroke();rr(g,-104,-14,208,62,22);g.fill();g.stroke();g.fillStyle='#101a2b';[-58,58].forEach(x=>{g.beginPath();g.arc(x,52,24,0,7);g.fill()})}
+ else if(n==='magnifier'){g.fillStyle='rgba(244,241,232,.35)';g.beginPath();g.arc(-14,-14,48,0,7);g.fill();g.lineWidth=12;g.stroke();g.lineWidth=18;g.beginPath();g.moveTo(22,22);g.lineTo(62,66);g.stroke()}
+ else if(n==='map'){g.fillStyle=P.card;rr(g,-88,-60,176,120,10);g.fill();g.stroke();g.lineWidth=3;g.beginPath();g.moveTo(-30,-60);g.lineTo(-30,60);g.moveTo(30,-60);g.lineTo(30,60);g.stroke();g.fillStyle=P.warn;g.beginPath();g.arc(10,-6,14,0,7);g.fill()}
+ else if(n==='book'){g.fillStyle=P.pos;rr(g,-72,-56,144,112,10);g.fill();g.stroke();g.fillStyle=P.card;g.fillRect(-56,-40,100,12);g.fillRect(-56,-16,70,10)}
+ else if(n==='shield'){g.fillStyle=P.pos;g.beginPath();g.moveTo(0,-70);g.lineTo(60,-46);g.quadraticCurveTo(58,40,0,76);g.quadraticCurveTo(-58,40,-60,-46);g.closePath();g.fill();g.stroke()}
+ else{g.fillStyle=mix(P.hl,P.text,.4);rr(g,-66,-50,132,110,10);g.fill();g.stroke();g.fillStyle=P.card;g.fillRect(-10,-50,20,110)}
+ g.restore()}
+
+/* ===== CHARACTER (นายถัง C1) ===== */
+function drawChar(g,x,y,pose,face,t,mo){
+ const bob=Math.sin(t*2.4)*5;g.save();g.translate(x,y);g.scale(.82,.82);g.lineJoin=g.lineCap='round';g.strokeStyle='#161c2c';g.lineWidth=6;
+ g.fillStyle='rgba(0,0,0,.28)';g.beginPath();g.ellipse(0,8,170,28,0,0,7);g.fill();
+ g.fillStyle=P.text;[-62,62].forEach(s=>{g.beginPath();g.ellipse(s,-14,52,28,0,0,7);g.fill();g.stroke()});
+ const bg=g.createLinearGradient(-130,-300,130,-30);bg.addColorStop(0,mix(CH.shirt,'#ffffff',.22));bg.addColorStop(1,mix(CH.shirt,CH.acc,.18));
+ const arm=(sx,hx,hy)=>{g.lineWidth=58;g.strokeStyle='#161c2c';g.beginPath();g.moveTo(sx,-240+bob);g.lineTo(hx,hy+bob);g.stroke();g.lineWidth=44;g.strokeStyle=CH.shirt;g.stroke();g.strokeStyle='#161c2c';g.lineWidth=6;g.fillStyle=CH.skin;g.beginPath();g.arc(hx,hy+bob,30,0,7);g.fill();g.stroke()};
+ const w=Math.sin(t*5);
+ let L=[-180,-120],R=[180,-120];
+ if(pose==='talk')R=[200,-210+w*30];
+ else if(pose==='point'){R=[290,-390+w*6]}
+ else if(pose==='think'){R=[62,-300]}
+ else if(pose==='cheer'){L=[-240,-450+w*20];R=[240,-450-w*20]}
+ arm(-125,L[0],L[1]);
+ g.fillStyle=bg;g.beginPath();g.ellipse(0,-170+bob,138,150,0,0,7);g.fill();g.stroke();
+ g.fillStyle=CH.acc;g.fillRect(-12,-270+bob,24,230);g.globalAlpha=.9;g.fillRect(-118,-120+bob,236,16);g.globalAlpha=1;
+ arm(125,R[0],R[1]);
+ const hy=-420+bob;
+ const hg=g.createRadialGradient(-30,hy-40,20,0,hy,150);hg.addColorStop(0,mix(CH.skin,'#ffffff',.25));hg.addColorStop(1,CH.skin);
+ g.fillStyle=CH.skin;[-140,140].forEach(s=>{g.beginPath();g.arc(s,hy+10,26,0,7);g.fill();g.stroke()});
+ g.fillStyle=hg;g.beginPath();g.arc(0,hy,142,0,7);g.fill();g.stroke();
+ g.fillStyle=CH.hair;g.beginPath();g.arc(0,hy,142,Math.PI+.12,2*Math.PI-.12);g.quadraticCurveTo(0,hy-84,-140,hy-20);g.closePath();g.fill();g.stroke();
+ const bl=(t%4.3)<.12,br=face==='surprised'?-20:0;
+ [-54,54].forEach(s=>{g.fillStyle='rgba(255,255,255,.9)';g.beginPath();g.ellipse(s,hy+10,38,bl?3:38,0,0,7);g.fill();
+  if(!bl){g.fillStyle='#161c2c';g.beginPath();g.arc(s+4,hy+12,15,0,7);g.fill();g.fillStyle='#fff';g.beginPath();g.arc(s+9,hy+6,5,0,7);g.fill()}
+  g.lineWidth=8;g.strokeStyle='#161c2c';g.beginPath();g.arc(s,hy+10,46,0,7);g.stroke();g.lineWidth=7;g.beginPath();g.moveTo(s-30,hy-48+br);g.lineTo(s+30,hy-48+br+(face==='smirk'&&s>0?-10:0));g.stroke()});
+ g.lineWidth=8;g.beginPath();g.moveTo(-8,hy+8);g.lineTo(8,hy+8);g.stroke();
+ g.lineWidth=7;g.fillStyle='#7a2f2f';const my=hy+90;
+ if(pose==='talk'&&mo!==undefined){g.beginPath();g.ellipse(0,my,26,6+mo*26,0,0,7);g.fill();g.stroke()}
+ else if(face==='happy'){g.beginPath();g.arc(0,my-18,36,.2,Math.PI-.2);g.stroke();g.fillStyle='rgba(230,83,83,.35)';[-90,90].forEach(s=>{g.beginPath();g.arc(s,hy+60,16,0,7);g.fill()})}
+ else if(face==='surprised'){g.beginPath();g.ellipse(0,my,16,22,0,0,7);g.fill();g.stroke()}
+ else if(face==='smirk'){g.beginPath();g.moveTo(-26,my);g.quadraticCurveTo(10,my+14,34,my-12);g.stroke()}
+ else{g.beginPath();g.moveTo(-24,my);g.lineTo(24,my);g.stroke()}
+ g.restore()}
+
+/* ===== TIMELINE / SYNC ===== */
+let A=null,T=null;const adj=G.scenes.map(()=>0);
+const wOf=c=>c==='\n'?6:(c===' '||c===',')?3:('.?!'.includes(c))?(c==='.'?2:6):(/[\u0E00-\u0E7F\w]/.test(c)?1:.5);
+const pw=(s,k)=>{let a=0;for(let i=0;i<k;i++)a+=wOf(s[i]);return a};
+function chunksOf(txt){const out=[];let pos=0;for(const part of txt.split(/\n+/)){if(!part.trim())continue;const k=txt.indexOf(part,pos);pos=k+part.length;
+ let cur='',cs=k,o=k;for(const w of part.split(' ')){const st=o;o+=w.length+1;if(!cur){cur=w;cs=st}else if((cur+' '+w).length>56){out.push([cur,cs]);cur=w;cs=st}else cur+=' '+w}
+ if(cur)out.push([cur,cs])}return out}
+function build(){
+ const sc=G.scenes,n=sc.length,sw=sc.map(s=>pw(s.n,s.n.length)),tw=sw.reduce((a,b)=>a+b,0);
+ const vd=A?A.ve-A.vs:tw/11,lead=.5,tail=2.6,total=lead+vd+tail,PS=A?A.pauses:[];
+ const raw=[0];let cum=0;for(let i=0;i<n;i++){cum+=sw[i];raw.push(cum/tw*vd)}
+ for(let i=1;i<n;i++){let b=raw[i],best=null;for(const p of PS){if(Math.abs((p.s+p.e)/2-b)<=1.2&&(!best||p.e-p.s>best.e-best.s))best=p}if(best)b=(best.s+best.e)/2;raw[i]=b}
+ for(let i=1;i<n;i++){raw[i]=clamp(raw[i]+adj[i],raw[i-1]+.5,vd)}raw[n]=vd;
+ const evK=(i,k,rad=.4)=>{const f=pw(sc[i].n,k)/sw[i];let t=raw[i]+f*(raw[i+1]-raw[i]),b=null,bd=rad+1;for(const p of PS){const d=Math.abs(p.e-t);if(d<bd){bd=d;b=p.e}}if(b!==null&&bd<=rad)t=b;return lead+t};
+ const evT=(i,tx)=>evK(i,Math.max(0,sc[i].n.indexOf(tx)));
+ const S=sc.map((s,i)=>{const a=i?lead+raw[i]:0,b=i===n-1?total:lead+raw[i+1];
+  const cds=s.cd.map(c=>({c,t:Math.max(a,evT(i,c.at))})).sort((x,y)=>x.t-y.t);
+  cds.forEach((o,j)=>{o.e=o.c.k==='end'?b:Math.min(o.t+o.c.d,j+1<cds.length?cds[j+1].t:b,b)});
+  const ch=chunksOf(s.n).map(([tx,k],j)=>({tx,t:j?Math.max(a,evK(i,k)):a}));
+  return {def:s,a,b,cds,ch,sfx:s.sf.map(([nm,at])=>({n:nm,t:Math.max(a,evT(i,at))}))}});
+ T={lead,total,sc:S,sfx:S.flatMap(s=>s.sfx)};
+ $('seek').max=1000;buildAdj()}
+const sceneAt=t=>{let r=0;T.sc.forEach((s,i)=>{if(t>=s.a)r=i});return r};
+
+function decodeAB(ab){return new Promise((res,rej)=>{let done=false;const ok=b=>{if(!done){done=true;res(b)}},ng=e=>{if(!done){done=true;rej(e||new Error('ถอดรหัสเสียงไม่ได้'))}};
+ try{const p=ac.decodeAudioData(ab,ok,ng);if(p&&p.then)p.then(ok,ng)}catch(e){ng(e)}})}
+async function readFile(f){if(f.arrayBuffer)return f.arrayBuffer();return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsArrayBuffer(f)})}
+
+async function loadAudio(f){initAC();
+ $('banner').className='';$('banner').textContent='กำลังอ่านไฟล์เสียง...';
+ const buf=await decodeAB(await readFile(f));
+ const d=buf.getChannelData(0);let pk=0;for(let i=0;i<d.length;i+=37){const v=Math.abs(d[i]);if(v>pk)pk=v}
+ if(pk<.001)throw new Error('ไฟล์นี้ไม่มีสัญญาณเสียง (เงียบทั้งไฟล์)');
+ const h=Math.round(buf.sampleRate*.02),n=Math.floor(d.length/h),env=new Float32Array(n);
+ for(let i=0;i<n;i++){let s=0;for(let j=0;j<h;j++){const v=d[i*h+j];s+=v*v}env[i]=Math.sqrt(s/h)}
+ const so=Array.from(env).sort((a,b)=>a-b),p95=so[Math.floor(n*.95)]||1,th=.08*p95;
+ let a=0;while(a<n&&env[a]<th)a++;let b=n-1;while(b>0&&env[b]<th)b--;
+ const pauses=[];let st=-1;for(let i=a;i<=b;i++){if(env[i]<th){if(st<0)st=i}else{if(st>=0&&i-st>=11)pauses.push({s:(st-a)*.02,e:(i-a)*.02});st=-1}}
+ pause();A={buf,env,p95,vs:a*.02,ve:(b+1)*.02,pauses};build();
+ $('banner').className='ok';$('banner').textContent=`✓ ${f.name} — ซิงก์แล้ว (${(A.ve-A.vs).toFixed(1)} วิ, จุดเงียบ ${pauses.length} จุด) กด ▶ เพื่อฟัง`;seek(0)}
+
+/* ===== RENDER ===== */
+function cardBox(g,x,y,w,h,acc,fill){g.save();g.shadowColor='rgba(0,0,0,.35)';g.shadowBlur=30;g.shadowOffsetY=12;rr(g,x,y,w,h,36);g.fillStyle=fill||P.card;g.fill();g.restore();g.save();rr(g,x,y,w,h,36);g.clip();g.fillStyle=acc||P.hl;g.fillRect(x,y,18,h);g.restore()}
+function drawCard(g,c,pr){
+ g.textAlign='center';g.textBaseline='middle';const cy=450;
+ if(c.k==='text'||c.k==='title'){g.font=F(64);const L=wrap(g,c.tx,780),h=L.length*84+80,y=c.k==='title'?170:cy-h/2;cardBox(g,90,y,900,h);g.fillStyle=P.text;L.forEach((l,i)=>g.fillText(l,555,y+82+84*i));
+  if(c.k==='title'){g.fillStyle=P.warn;g.fillRect(150,y+h-26,300,8)}}
+ else if(c.k==='list'){g.font=F(54);const h=c.items.length*96+60,y=cy-h/2;cardBox(g,90,y,900,h);g.textAlign='left';
+  c.items.forEach((it,j)=>{const r=eob(clamp((pr-.35*j)/.4));if(r<=0)return;g.save();g.globalAlpha*=clamp(r);g.translate((1-clamp(r))*-60,0);g.fillStyle=P.hl;g.beginPath();g.arc(150,y+78+96*j-18,14,0,7);g.fill();g.fillStyle=P.text;g.fillText(it,190,y+78+96*j-18);g.restore()})}
+ else if(c.k==='compare'){g.font=F(46);const a=wrap(g,c.l,340),b=wrap(g,c.r,340),m=Math.max(a.length,b.length),h=m*62+100,y=cy-h/2;
+  [[90,a,P.pos,'#fff'],[560,b,P.hl,P.text]].forEach(([x,L,f,tc])=>{g.save();g.shadowColor='rgba(0,0,0,.35)';g.shadowBlur=24;rr(g,x,y,430,h,32);g.fillStyle=f;g.fill();g.restore();g.fillStyle=tc;L.forEach((l,i)=>g.fillText(l,x+215,y+h/2+(i-(L.length-1)/2)*62))});
+  g.fillStyle=P.bg;g.beginPath();g.arc(540,cy,34,0,7);g.fill();g.fillStyle='#fff';g.font=F(28);g.fillText('VS',540,cy)}
+ else if(c.k==='big'){cardBox(g,90,270,900,360,P.warn);const v=parseFloat(c.v.replace(/,/g,''))*ease(clamp(pr/1.2));g.fillStyle=P.text;g.font=F(170);g.fillText(Math.round(v).toLocaleString('en-US'),555,410);g.font=F(54);g.fillText(c.u,555,545)}
+ else if(c.k==='map'){cardBox(g,90,220,900,460,P.pos);const p=ease(clamp(pr/1.4)),x1=270,x2=810,y=430;
+  g.fillStyle='rgba(20,43,69,.08)';g.beginPath();g.ellipse(x1,y,120,90,0,0,7);g.ellipse(x2,y,120,90,0,0,7);g.fill();
+  g.setLineDash([22,16]);g.lineWidth=8;g.strokeStyle=P.hl;g.beginPath();g.moveTo(x1,y);g.lineTo(x1+(x2-x1)*p,y);g.stroke();g.setLineDash([]);
+  g.fillStyle=P.pos;g.beginPath();g.arc(x1,y,26,0,7);g.fill();g.fillStyle=P.warn;g.beginPath();g.arc(x2,y,26,0,7);g.fill();g.fillStyle=P.hl;g.beginPath();g.arc(x1+(x2-x1)*p,y,16,0,7);g.fill();
+  g.fillStyle=P.text;g.font=F(50);g.fillText(c.fr,x1,y+100);g.fillText(c.to,x2,y+100);g.font=F(34);g.fillText('ราคาอ้างอิง',540,y-120)}
+ else if(c.k==='stamp'){g.save();g.translate(540,cy);g.rotate((c.ang||0)*Math.PI/180);const s=.4+.6*eob(clamp(pr/.35));g.scale(s,s);g.font=F(64);const L=wrap(g,c.tx,740),h=L.length*84+60,w=Math.min(900,Math.max(...L.map(l=>g.measureText(l).width))+100);
+  rr(g,-w/2,-h/2,w,h,28);g.fillStyle='rgba(244,241,232,.92)';g.fill();g.lineWidth=12;g.strokeStyle=P.warn;g.stroke();g.fillStyle=P.warn;L.forEach((l,i)=>g.fillText(l,0,(i-(L.length-1)/2)*84));g.restore()}
+ else if(c.k==='end'){g.font=F(60);const L=wrap(g,c.tx,780),h=L.length*80+190,y=cy-h/2;cardBox(g,90,y,900,h,P.hl,'rgba(14,30,50,.94)');
+  g.fillStyle=P.pos;rr(g,150,y+34,110,50,25);g.fill();g.fillStyle='#fff';g.font=F(30);g.fillText('จบ',205,y+60);g.font=F(60);g.fillStyle='#fff';
+  const ga=g.globalAlpha;L.forEach((l,i)=>{g.globalAlpha=ga*clamp(pr-.3-.25*i);g.fillText(l,555,y+135+80*i)});g.globalAlpha=ga;g.fillStyle=P.hl;g.fillRect(430,y+h-34,250*clamp(pr),8)}}
+function drawSub(g,sc,t){let cur=null;for(const c of sc.ch)if(t>=c.t)cur=c;if(!cur)return;const S=LY.sub;
+ g.save();g.globalAlpha*=ease(clamp((t-cur.t)/.2));g.font=F(S.fs);g.textBaseline='middle';g.textAlign='left';
+ const tx=cur.tx,fl=new Uint8Array(tx.length);for(const w of sc.def.hw){let k=-1;while((k=tx.indexOf(w,k+1))>=0)for(let j=0;j<w.length;j++)fl[k+j]=1}
+ const lines=[];let ln=[],lw=0;for(const s of SEG.segment(tx)){const w=g.measureText(s.segment).width;if(ln.length&&lw+w>S.mw){lines.push([ln,lw]);ln=[];lw=0}ln.push([s,w]);lw+=w}if(ln.length)lines.push([ln,lw]);
+ const y0=S.y-(lines.length-1)*S.lh/2;g.lineJoin='round';g.lineWidth=12;g.strokeStyle='#0d1a2b';
+ lines.forEach(([l,w],i)=>{let x=LY.W/2-w/2;for(const [s,sw] of l){g.strokeText(s.segment,x,y0+i*S.lh);g.fillStyle=fl[s.index]?P.hl:'#fff';g.fillText(s.segment,x,y0+i*S.lh);x+=sw}});g.restore()}
+
+function renderAtTime(g,t,s){
+ const W=LY.W,H=LY.H,cx=W/2,cy=H/2;
+ g.setTransform(s,0,0,s,0,0);g.globalAlpha=1;g.fillStyle=P.bg;g.fillRect(0,0,W,H);
+ const i=sceneAt(t),sc=T.sc[i],d=sc.def,lt=t-sc.a,dur=sc.b-sc.a;
+ const p=ease(clamp(lt/.4));g.save();g.globalAlpha=p;
+ if(d.tr==='zoom'){const k=1.07-.07*p;g.translate(cx,cy);g.scale(k,k);g.translate(-cx,-cy)}else if(d.tr==='slide')g.translate((1-p)*120,0);
+ g.save();const pr=clamp(lt/dur);
+ if(d.cam==='push'){const k=1+.05*pr;g.translate(cx,cy);g.scale(k,k);g.translate(-cx,-cy)}else{g.translate(-20+40*pr,0);g.translate(cx,cy);g.scale(1.04,1.04);g.translate(-cx,-cy)}
+ g.drawImage(getBg(d,i),0,0,W,H);
+ if(LY.slots)d.pr.forEach((q,j)=>{const sl=LY.slots[j%LY.slots.length];prop(g,q[0],sl[0]*W,sl[1]*H,q[3]*sl[2],t)});
+ else for(const q of d.pr)prop(g,q[0],q[1]*1080,q[2]*1920-60,q[3],t);
+ let mo;if(d.a[0]==='talk'){if(A){const k=Math.floor((t-T.lead+A.vs)/.02);mo=clamp((A.env[k]||0)/A.p95*1.1)}else mo=Math.abs(Math.sin(t*9))*.6}
+ const cp=LY.ch||[d.a[2],d.a[3]-.1,1];g.save();g.translate(cp[0]*W,cp[1]*H);g.scale(cp[2],cp[2]);drawChar(g,0,0,d.a[0],d.a[1],t,mo);g.restore();
+ g.restore();
+ const k=LY.card;g.save();g.translate(k[0],k[1]);g.scale(k[2],k[2]);
+ for(const o of sc.cds){if(t<o.t||t>=o.e)continue;const tt=t-o.t,a=ease(clamp(tt/.35))*ease(clamp((o.e-t)/.3));g.save();g.globalAlpha*=a;g.translate(0,(1-a)*50);drawCard(g,o.c,tt);g.restore()}
+ g.restore();
+ drawSub(g,sc,t);g.restore()}
+
+/* ===== AUDIO ===== */
+let ac,master,muted=false,keepAlive=null,sess=null;
+function initAC(){if(ac)return;
+ try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){} // iOS 17+: ไม่ให้สวิตช์เงียบตัดเสียง
+ ac=new(window.AudioContext||window.webkitAudioContext)();master=ac.createGain();master.gain.value=muted?0:1;
+ const cp=ac.createDynamicsCompressor();master.connect(cp);cp.connect(ac.destination)}
+function unlockAC(){initAC();if(ac.state!=='running'){try{const p=ac.resume();if(p&&p.catch)p.catch(()=>{})}catch(e){}}}
+function silentWav(){const sr=8000,n=4000,b=new ArrayBuffer(44+n*2),v=new DataView(b),w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+ w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+ return URL.createObjectURL(new Blob([b],{type:'audio/wav'}))}
+/* iOS รุ่นเก่า: เล่นไฟล์เงียบผ่าน <audio> เพื่อสลับเป็นโหมด "เล่นสื่อ" ทำให้ได้ยินเสียงแม้เปิดสวิตช์เงียบ */
+function keepAliveOn(){try{if(!keepAlive){keepAlive=new Audio(silentWav());keepAlive.loop=true;keepAlive.setAttribute('playsinline','')}const p=keepAlive.play();if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+function keepAliveOff(){try{keepAlive&&keepAlive.pause()}catch(e){}}
+function tone(c,o,f1,f2,du,ty,v,w){const x=c.createOscillator(),g=c.createGain();x.type=ty;x.frequency.setValueAtTime(f1,w);x.frequency.exponentialRampToValueAtTime(f2,w+du);g.gain.setValueAtTime(v,w);g.gain.exponentialRampToValueAtTime(.001,w+du);x.connect(g);g.connect(o);x.start(w);x.stop(w+du+.05);return x}
+function noise(c,o,du,f1,f2,v,w){const b=c.createBuffer(1,Math.ceil(c.sampleRate*du),c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();s.buffer=b;f.type='bandpass';f.frequency.setValueAtTime(f1,w);f.frequency.exponentialRampToValueAtTime(f2,w+du);g.gain.setValueAtTime(v,w);g.gain.exponentialRampToValueAtTime(.001,w+du);s.connect(f);f.connect(g);g.connect(o);s.start(w);return s}
+function playSfx(c,o,n,w){const v=.4;
+ if(n==='pop')tone(c,o,700,200,.12,'sine',v,w);else if(n==='whoosh')noise(c,o,.45,300,3000,v,w);
+ else if(n==='coin'){tone(c,o,988,988,.1,'square',v*.4,w);tone(c,o,1319,1319,.3,'square',v*.4,w+.09)}
+ else if(n==='stamp'){tone(c,o,140,45,.25,'sine',v*1.4,w);noise(c,o,.12,800,200,v,w)}
+ else if(n==='ding')tone(c,o,1320,1300,.9,'sine',v,w);else tone(c,o,900,700,.06,'square',v*.3,w)}
+function scheduleAudio(c,out,from,now){const S=[];
+ if(A){const s=c.createBufferSource();s.buffer=A.buf;s.connect(out);const L=T.lead,vd=A.ve-A.vs;
+  if(from<=L){s.start(now+L-from,A.vs,vd);S.push(s)}else if(from-L<vd){s.start(now,A.vs+from-L,vd-(from-L));S.push(s)}}
+ for(const e of T.sfx)if(e.t>=from)playSfx(c,out,e.n,now+e.t-from);
+ const mg=c.createGain();mg.gain.value=.1;mg.connect(out);const beat=60/G.music.bpm,CHD=[[0,4,7],[-3,0,4],[-7,-3,0],[-5,-1,2]];
+ for(let k=Math.max(0,Math.floor(from/(beat/2)));k*beat/2<T.total;k++){const tt=k*beat/2;if(tt<from)continue;const ch=CHD[Math.floor(k/8)%4],m=72+ch[[0,1,2,1][k%4]],f=440*Math.pow(2,(m-69)/12);
+  tone(c,mg,f,f*.998,.35,'triangle',.5,now+tt-from);if(k%4===0){const b=440*Math.pow(2,(60+ch[0]-69)/12);tone(c,mg,b,b,.5,'sine',.6,now+tt-from)}}
+ return S}
+
+/* ===== PLAYER ===== */
+let playing=false,tNow=0,tBase=0,ctStart=0,srcs=[];const cv=$('cv'),cg=cv.getContext('2d');let exporting=false;
+function stopAudio(){srcs.forEach(s=>{try{s.stop()}catch(e){}});srcs=[];if(sess){try{sess.disconnect()}catch(e){}sess=null}} // ตัดเพลง+เอฟเฟกต์ที่ตั้งเวลาไว้ด้วย
+function play(){if(!T)return;unlockAC();keepAliveOn();if(tNow>=T.total-.05)tNow=0;stopAudio();
+ const go=()=>{stopAudio();sess=ac.createGain();sess.connect(master);const now=ac.currentTime+.05;srcs=scheduleAudio(ac,sess,tNow,now);tBase=tNow;ctStart=now;playing=true;$('pl').textContent='⏸'};
+ if(ac.state==='running')go();else ac.resume().then(go,go);
+ setTimeout(()=>{if(playing&&ac.state!=='running'){$('banner').className='';$('banner').textContent='เบราว์เซอร์ยังไม่เปิดเสียง — แตะปุ่ม ▶ อีกครั้ง'}},900)}
+function pause(){playing=false;stopAudio();keepAliveOff();$('pl').textContent='▶'}
+function seek(t){if(!T)return;tNow=clamp(t,0,T.total);if(playing)play()}
+const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+function loop(){if(T&&!exporting){if(playing){tNow=tBase+Math.max(0,ac.currentTime-ctStart);if(tNow>=T.total){tNow=T.total;pause()}}
+ renderAtTime(cg,tNow,cv.width/LY.W);$('seek').value=tNow/T.total*1000;$('tm').textContent=fmt(tNow)+' / '+fmt(T.total);
+ const i=sceneAt(tNow);document.querySelectorAll('#scenes button').forEach((b,j)=>b.classList.toggle('on',i===j))}
+ requestAnimationFrame(loop)}
+function buildAdj(){const l=$('adjList');l.innerHTML='';G.scenes.forEach((s,i)=>{if(!i)return;const r=document.createElement('div');r.className='row';r.innerHTML=`<span>${s.id} เริ่มที่ <b>${T.sc[i].a.toFixed(1)}</b> วิ (${adj[i]>=0?'+':''}${adj[i].toFixed(1)})</span>`;
+ [['−0.1',-.1],['+0.1',.1]].forEach(([tx,dv])=>{const b=document.createElement('button');b.className='alt';b.textContent=tx;b.onclick=()=>{adj[i]=Math.round((adj[i]+dv)*10)/10;build()};r.appendChild(b)});l.appendChild(r)})}
+function setFormat(k){if(!FMT[k])k='v1080';fmtKey=k;LY=LAY[FMT[k].L];cv.width=LY.pv[0];cv.height=LY.pv[1];$('stage').className=FMT[k].L;$('fmt').value=k;try{localStorage.setItem('fmt',k)}catch(e){}}
+
+/* ===== EXPORT ===== */
+let cancelFlag=false,lastURL=null;
+const FPS=30,SR=48000;
+function setP(txt,frac){if(txt!=null)$('prog').textContent=txt;if(frac!=null)$('bar').firstChild.style.width=(clamp(frac)*100)+'%'}
+const hasWC=()=>['VideoEncoder','AudioEncoder','VideoFrame','AudioData'].every(k=>k in window);
+function loadScript(src){return new Promise((res,rej)=>{if(window.Mp4Muxer)return res();const s=document.createElement('script');s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error('โหลดตัวรวมไฟล์ MP4 ไม่ได้ (ต้องต่ออินเทอร์เน็ต)'));document.head.appendChild(s)})}
+
+async function pickVideoCfg(W,H,br){
+ const codecs=W*H>1e6?['avc1.640028','avc1.4d0028','avc1.42e028','avc1.640033']:['avc1.42e01f','avc1.4d001f','avc1.640028','avc1.42e028'];
+ for(const codec of codecs)for(const hw of ['prefer-hardware','no-preference']){
+  const cfg={codec,width:W,height:H,bitrate:br,framerate:FPS,hardwareAcceleration:hw,avc:{format:'avc'}};
+  try{const s=await VideoEncoder.isConfigSupported(cfg);if(s.supported)return cfg}catch(e){}}
+ return null}
+async function pickAudioCfg(kind){
+ const codec=kind==='aac'?'mp4a.40.2':'opus',cfg={codec,sampleRate:SR,numberOfChannels:2,bitrate:128000};
+ try{const s=await AudioEncoder.isConfigSupported(cfg);if(s.supported)return {cfg,mux:kind}}catch(e){}
+ return null}
+function recMime(kind){
+ if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)return null;
+ const L=kind==='mp4'?['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4;codecs=h264,aac','video/mp4']
+  :['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+ return L.find(m=>{try{return MediaRecorder.isTypeSupported(m)}catch(e){return false}})||null}
+
+function renderAudioOffline(){
+ const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+ const oc=new OAC(2,Math.ceil(T.total*SR),SR);const cp=oc.createDynamicsCompressor();cp.connect(oc.destination);
+ const g=oc.createGain();g.connect(cp);scheduleAudio(oc,g,0,0);
+ return new Promise((res,rej)=>{oc.oncomplete=e=>res(e.renderedBuffer);try{const p=oc.startRendering();if(p&&p.then)p.then(res,rej)}catch(e){rej(e)}})}
+function peakOf(buf){let pk=0;for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=0;i<d.length;i+=31){const v=Math.abs(d[i]);if(v>pk)pk=v}}return pk}
+
+/* วิธี A: WebCodecs → MP4 (H.264 + AAC) ทีละเฟรม */
+async function exportWebCodecs(W,H,br,acfg){
+ setP('กำลังเตรียมตัวเข้ารหัส MP4...',0);
+ await loadScript('https://cdn.jsdelivr.net/npm/mp4-muxer@5/build/mp4-muxer.min.js');
+ const vcfg=await pickVideoCfg(W,H,br);if(!vcfg)throw new Error('ไม่รองรับ H.264 ขนาดนี้');
+ setP('กำลังสร้างเสียง...',0);
+ const ab=await renderAudioOffline();
+ if(peakOf(ab)<1e-4)throw new Error('เสียงที่สร้างออกมาเงียบ');
+ const {Muxer,ArrayBufferTarget}=window.Mp4Muxer,target=new ArrayBufferTarget();
+ const muxer=new Muxer({target,video:{codec:'avc',width:W,height:H,frameRate:FPS},audio:{codec:acfg.mux,numberOfChannels:2,sampleRate:SR},fastStart:'in-memory',firstTimestampBehavior:'offset'});
+ let encErr=null,aCount=0,vCount=0;
+ const ve=new VideoEncoder({output:(c,m)=>{vCount++;muxer.addVideoChunk(c,m)},error:e=>encErr=e});ve.configure(vcfg);
+ const ae=new AudioEncoder({output:(c,m)=>{aCount++;muxer.addAudioChunk(c,m)},error:e=>encErr=e});ae.configure(acfg.cfg);
+ const N=ab.length,Lc=ab.getChannelData(0),Rc=ab.numberOfChannels>1?ab.getChannelData(1):Lc,BL=4800;
+ for(let o=0;o<N;o+=BL){const n=Math.min(BL,N-o),d=new Float32Array(n*2);d.set(Lc.subarray(o,o+n),0);d.set(Rc.subarray(o,o+n),n);
+  const ad=new AudioData({format:'f32-planar',sampleRate:SR,numberOfFrames:n,numberOfChannels:2,timestamp:Math.round(o/SR*1e6),data:d});ae.encode(ad);ad.close()}
+ await ae.flush();if(encErr)throw encErr;
+ if(!aCount)throw new Error('ตัวเข้ารหัสเสียงไม่ส่งข้อมูลออกมา');
+ const ec=document.createElement('canvas');ec.width=W;ec.height=H;const eg=ec.getContext('2d');
+ const frames=Math.ceil(T.total*FPS),fd=1e6/FPS,t0=performance.now();
+ for(let i=0;i<frames;i++){
+  if(cancelFlag){try{ve.close();ae.close()}catch(e){}return null}
+  if(encErr)throw encErr;
+  const t=i/FPS;renderAtTime(eg,t,W/LY.W);
+  const vf=new VideoFrame(ec,{timestamp:Math.round(i*fd),duration:Math.round(fd)});
+  ve.encode(vf,{keyFrame:i%(FPS*2)===0});vf.close();
+  while(ve.encodeQueueSize>6)await sleep(2);
+  if(i%8===0){const el=(performance.now()-t0)/1000,eta=i?el/i*(frames-i):0;
+   setP(`วิธี: WebCodecs → MP4 ${W}×${H}\n${Math.floor(i/frames*100)}% • ${fmt(t)} / ${fmt(T.total)} • เหลือประมาณ ${Math.ceil(eta)} วิ`,i/frames);await sleep(0)}}
+ await ve.flush();if(encErr)throw encErr;if(!vCount)throw new Error('ตัวเข้ารหัสภาพไม่ส่งข้อมูลออกมา');
+ ve.close();ae.close();muxer.finalize();
+ return new Blob([target.buffer],{type:'video/mp4'})}
+
+/* วิธี B: MediaRecorder เรียลไทม์ (Safari iOS ได้ MP4/AAC) — เวลาเดินตามนาฬิกาเสียง */
+async function exportRecorder(W,H,br,mime){
+ if(ac.state!=='running'){try{await ac.resume()}catch(e){}}
+ if(ac.state!=='running')throw new Error('ระบบเสียงยังไม่ทำงาน — แตะปุ่มสร้างวิดีโออีกครั้ง');
+ const ec=document.createElement('canvas');ec.width=W;ec.height=H;ec.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';document.body.appendChild(ec);const eg=ec.getContext('2d');
+ const dest=ac.createMediaStreamDestination(),og=ac.createGain(),cp=ac.createDynamicsCompressor(),z=ac.createGain();z.gain.value=0;
+ og.connect(cp);cp.connect(dest);cp.connect(z);z.connect(ac.destination);
+ renderAtTime(eg,0,W/LY.W);
+ const at=dest.stream.getAudioTracks();if(!at.length)throw new Error('ไม่พบแทร็กเสียง');
+ const stream=new MediaStream([...ec.captureStream(FPS).getVideoTracks(),...at]);
+ let rec;try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:br,audioBitsPerSecond:128000})}catch(e){rec=new MediaRecorder(stream,{mimeType:mime})}
+ const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+ const done=new Promise(r=>rec.onstop=r);
+ const head=`วิธี: บันทึกแบบเรียลไทม์ (${mime.split(';')[0]}) ${W}×${H} — เปิดหน้านี้ค้างไว้ ~${Math.ceil(T.total)} วินาที ห้ามสลับแอป`;setP(head,0);
+ rec.start(1000);const st0=ac.currentTime+.15,es=scheduleAudio(ac,og,0,st0);
+ let lastCT=-1,lastWall=performance.now(),stalled=false;
+ await new Promise(res=>{const step=()=>{const ct=ac.currentTime,now=performance.now();
+  if(ct!==lastCT){lastCT=ct;lastWall=now}else if(now-lastWall>2000){stalled=true;res();return}
+  const t=ct-st0;if(cancelFlag||t>=T.total){res();return}
+  renderAtTime(eg,Math.max(0,t),W/LY.W);setP(head+`\n${Math.max(0,Math.floor(t/T.total*100))}% • ${fmt(Math.max(0,t))} / ${fmt(T.total)}`,t/T.total);requestAnimationFrame(step)};step()});
+ es.forEach(s=>{try{s.stop()}catch(e){}});await sleep(300);rec.stop();await done;
+ try{og.disconnect();cp.disconnect();z.disconnect()}catch(e){}
+ stream.getTracks().forEach(t=>t.stop());ec.remove();
+ if(stalled)throw new Error('ระบบเสียงหยุดระหว่างบันทึก (อาจล็อกจอหรือสลับแอป) กรุณาลองใหม่');
+ if(cancelFlag)return null;
+ return new Blob(chunks,{type:(rec.mimeType||mime).split(';')[0]||'video/mp4'})}
+
+async function exportVideo(){
+ if(!T||exporting)return;pause();unlockAC();
+ try{await ac.resume()}catch(e){}
+ try{await document.fonts.ready}catch(e){}
+ if(!A&&!confirm('ยังไม่ได้ใส่เสียงพากย์ ต้องการสร้างวิดีโอโดยไม่มีเสียงพากย์หรือไม่?'))return;
+ const f=FMT[fmtKey],W=f.W,H=f.H;
+ exporting=true;cancelFlag=false;$('mk').hidden=true;$('cancel').hidden=false;$('fmt').disabled=true;$('res').innerHTML='';
+ if(lastURL){URL.revokeObjectURL(lastURL);lastURL=null}
+ let wl=null;try{wl=await navigator.wakeLock.request('screen')}catch(e){}
+ // ลำดับ: MP4+AAC (WebCodecs) → MP4 (MediaRecorder) → MP4+Opus → WebM
+ const tries=[];
+ if(hasWC()){const a=await pickAudioCfg('aac');if(a)tries.push(['WebCodecs • H.264 + AAC',()=>exportWebCodecs(W,H,f.br,a)])}
+ const m4=recMime('mp4');if(m4)tries.push(['MediaRecorder • MP4',()=>exportRecorder(W,H,f.br,m4)]);
+ if(hasWC()){const o=await pickAudioCfg('opus');if(o)tries.push(['WebCodecs • H.264 + Opus',()=>exportWebCodecs(W,H,f.br,o)])}
+ const wm=recMime('webm');if(wm)tries.push(['MediaRecorder • WebM',()=>exportRecorder(W,H,f.br,wm)]);
+ let blob=null,method='',lastErr=null;
+ for(const [name,fn] of tries){if(cancelFlag)break;try{blob=await fn();if(blob&&blob.size){method=name;break}}catch(e){console.warn(name,e);lastErr=e;blob=null}}
+ try{wl&&wl.release()}catch(e){}
+ exporting=false;$('mk').hidden=false;$('cancel').hidden=true;$('fmt').disabled=false;
+ if(cancelFlag){setP('ยกเลิกแล้ว',0);return}
+ if(!blob){setP('สร้างวิดีโอไม่สำเร็จ: '+(lastErr?lastErr.message:'เบราว์เซอร์นี้ไม่รองรับ ลองใช้ Chrome หรือ Safari รุ่นล่าสุด'),0);return}
+ await showResult(blob,method)}
+
+async function checkAudio(blob){
+ if(blob.size>150*1048576)return null;
+ try{const b=await decodeAB(await blob.arrayBuffer());return {ok:peakOf(b)>.003,dur:b.duration}}catch(e){return null}}
+
+async function showResult(blob,method){
+ const isMp4=blob.type.includes('mp4'),ext=isMp4?'mp4':'webm',f=FMT[fmtKey],name=`animated_explainer_${f.W}x${f.H}.${ext}`;
+ const file=new File([blob],name,{type:isMp4?'video/mp4':blob.type});
+ const url=lastURL=URL.createObjectURL(blob);
+ const head=`✓ เสร็จแล้ว • ${ext.toUpperCase()} ${f.W}×${f.H} • ${(blob.size/1048576).toFixed(1)} MB\nวิธี: ${method}`;
+ setP(head+'\nกำลังตรวจเสียงในไฟล์...',1);
+ const res=$('res');res.innerHTML=`<video controls playsinline preload="metadata" src="${url}"></video>`;
+ if(navigator.canShare&&navigator.canShare({files:[file]})){
+  const b=document.createElement('button');b.textContent='📲 บันทึกลงรูปภาพ / แชร์';
+  b.onclick=()=>navigator.share({files:[file],title:'วิดีโอ'}).catch(()=>{});res.appendChild(b)}
+ const a=document.createElement('a');a.className='btn';a.href=url;a.download=name;a.textContent='⬇ ดาวน์โหลดไฟล์ .'+ext;res.appendChild(a);
+ const h=document.createElement('div');h.className='hint';
+ h.textContent=isIOS?'iPhone/iPad: กด "บันทึกลงรูปภาพ / แชร์" แล้วเลือก "บันทึกวิดีโอ" หรือกดดาวน์โหลดเพื่อเก็บในแอปไฟล์ (Files)'
+  :'Android: กดดาวน์โหลด ไฟล์จะอยู่ในโฟลเดอร์ Download หรือกดแชร์ส่งเข้า YouTube / TikTok ได้เลย';
+ res.appendChild(h);
+ if(!isMp4||method.includes('Opus')){const w=document.createElement('div');w.className='hint';w.style.color='#F4A340';
+  w.textContent='⚠ เบราว์เซอร์นี้สร้างเสียง AAC ไม่ได้ ไฟล์อาจไม่มีเสียงบน iPhone แนะนำให้สร้างใหม่ด้วย Chrome หรือ Safari รุ่นล่าสุด';res.appendChild(w)}
+ const chk=await checkAudio(blob);
+ setP(head+'\n'+(chk==null?'ตรวจเสียงอัตโนมัติไม่ได้ ลองกดเล่นวิดีโอด้านล่าง'
+  :chk.ok?`✓ ตรวจแล้ว: มีเสียงในไฟล์ (${chk.dur.toFixed(1)} วิ)`
+  :'⚠ ตรวจพบว่าไฟล์นี้ไม่มีเสียง กรุณาสร้างใหม่ เปิดหน้านี้ค้างไว้ และอย่าล็อกจอ'),1)}
+
+/* ===== INIT ===== */
+['pointerdown','touchend','keydown'].forEach(ev=>document.addEventListener(ev,unlockAC,{passive:true}));
+$('file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)loadAudio(f).catch(err=>{$('banner').className='';$('banner').textContent='อ่านไฟล์เสียงไม่ได้: '+(err&&err.message||err)+' (ลองแปลงเป็น mp3 หรือ m4a)'})};
+$('pl').onclick=()=>{playing?pause():play()};
+$('seek').oninput=e=>seek(e.target.value/1000*T.total);
+$('mu').onclick=()=>{initAC();muted=!muted;master.gain.value=muted?0:1;$('mu').textContent=muted?'🔇':'🔊'};
+$('fs').onclick=()=>{const s=$('stage');try{(s.requestFullscreen||s.webkitRequestFullscreen).call(s)}catch(e){}};
+$('fmt').onchange=e=>setFormat(e.target.value);
+$('mk').onclick=exportVideo;$('cancel').onclick=()=>{cancelFlag=true};
+$('ahint').hidden=!isIOS;
+let saved=null;try{saved=localStorage.getItem('fmt')}catch(e){}
+setFormat(saved||'v1080');
+G.scenes.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.id;b.onclick=()=>seek(T.sc[i].a+.01);$('scenes').appendChild(b)});
+build();
+Promise.race([document.fonts.load('700 56px Prompt','ทดสอบ'),new Promise(r=>setTimeout(r,2500))]).catch(()=>{}).then(()=>loop());
+</script></body></html>
